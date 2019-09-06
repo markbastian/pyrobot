@@ -33,7 +33,7 @@ def forward_dist(dist, tire_radius=0.028):
 
 
 def forward(speed, correction=0):
-    speed = -speed;
+    speed = -speed
     ls = speed+10*correction
     rs = speed-10*correction
     if ls > MAX_POS_SPEED:
