@@ -27,10 +27,8 @@ def speak(words):
     sound.speak(words)
 
 
-print("Press the touch sensor to change the LED color!")
-
-
 def test_touch():
+    # print("Press the touch sensor to change the LED color!")
     while touch.is_pressed:
         leds.set_color("LEFT", "RED")
         leds.set_color("RIGHT", "RED")
@@ -40,17 +38,49 @@ def test_touch():
 
 
 def dump_gyro():
+    max_rate = 0
     while not touch.is_pressed:
-        print(gyro.angle)
+        angle, rate = gyro.angle_and_rate
+        max_rate = max(max_rate, rate)
+        print('%s, %s, %s' % (angle, rate, max_rate))
 
 
-def balance():
-    while not touch.is_pressed:
-        a = gyro.angle / 90.0
-        if a != 0:
-            speed = SpeedPercent(100.0 * a)
+def constraint_to_unit(v):
+    return max(min(v, 1.0), -1.0)
+
+
+def reset_gyro():
+    if gyro.mode == 'GYRO-RATE':
+        gyro.mode = 'GYRO-ANG'
+        gyro.mode = 'GYRO-RATE'
+    else:
+        mode = gyro.mode
+        gyro.mode = 'GYRO-RATE'
+        gyro.mode = mode
+
+
+def balance(k_p=1.0, k_i=0.0, k_d=0.0, baseline=1.0):
+    reset_gyro()
+    max_theta = 30
+    # A basic drop test shows a max rate of about 493
+    max_rate = 500
+    integrated_error = 0.0
+    theta, rate = gyro.angle_and_rate
+    while abs(theta) <= max_theta:
+        error = constraint_to_unit((theta - baseline) / max_theta)
+        rate_error = constraint_to_unit(rate / max_rate)
+        pid = k_p * error + k_i * integrated_error + k_d * rate_error
+        speedpct = 100.0 * constraint_to_unit(pid)
+        print('theta=%s, rate=%s, error=%s, rate_error=%s, pid=%s, speedpct=%s' %
+              (theta, rate, error, rate_error, pid, speedpct))
+        if pid != 0:
+            speed = SpeedPercent(speedpct)
             tank_drive.on(speed, speed)
         else:
             tank_drive.off()
-
+        theta, rate = gyro.angle_and_rate
     tank_drive.off()
+
+# balance(k_p=5.0, k_i=0.0, k_d=0.0)
+# balance(k_p=4.0, k_i=0.0, k_d=0.0)
+# balance(k_p=2.9, k_i=0.0, k_d=0.1, baseline=3.0)
